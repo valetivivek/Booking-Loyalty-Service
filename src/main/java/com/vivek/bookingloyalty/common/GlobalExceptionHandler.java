@@ -2,6 +2,7 @@ package com.vivek.bookingloyalty.common;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -41,6 +42,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException ex, HttpServletRequest req) {
         return build(HttpStatus.FORBIDDEN, "Access denied", req);
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<ApiError> handleOptimisticLock(OptimisticLockingFailureException ex,
+                                                         HttpServletRequest req) {
+        return build(HttpStatus.CONFLICT, "Resource was modified concurrently; please retry", req);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
