@@ -13,6 +13,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 
 /**
@@ -21,7 +22,10 @@ import java.time.Instant;
  * lets us guard against awarding points twice for the same booking.
  */
 @Entity
-@Table(name = "loyalty_transactions")
+@Table(name = "loyalty_transactions",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uq_loyalty_tx_booking_type",
+                columnNames = {"booking_id", "transaction_type"}))
 public class LoyaltyTransaction {
 
     @Id

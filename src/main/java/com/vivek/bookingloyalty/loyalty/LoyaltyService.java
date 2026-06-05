@@ -42,6 +42,37 @@ public class LoyaltyService {
         return LoyaltyResponse.from(requireAccountForUser(userId));
     }
 
+    /**
+     * Redeems points from the caller's account: validates the amount and
+     * balance, deducts the points, recomputes the tier, and records a REDEEMED
+     * ledger entry (stored as a negative delta, so the ledger sums to the
+     * balance). Optimistic locking on the account protects against a concurrent
+     * award/redeem race.
+     */
+    @Transactional
+    public LoyaltyResponse redeemPoints(Long userId, long points) {
+        if (points <= 0) {
+            throw new BadRequestException("Points to redeem must be positive");
+        }
+
+        LoyaltyAccount account = requireAccountForUser(userId);
+        if (account.getPointsBalance() < points) {
+            throw new BadRequestException("Insufficient points balance");
+        }
+
+        account.addPoints(-points);
+        loyaltyAccountRepository.save(account);
+
+        loyaltyTransactionRepository.save(new LoyaltyTransaction(
+                account,
+                null,
+                -points,
+                TransactionType.REDEEMED,
+                "Redeemed " + points + " points"));
+
+        return LoyaltyResponse.from(account);
+    }
+
     @Transactional(readOnly = true)
     public List<LoyaltyTransactionResponse> getTransactionsByUserId(Long userId) {
         LoyaltyAccount account = requireAccountForUser(userId);

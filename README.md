@@ -112,8 +112,12 @@ users (1) ──< (1) customer_profiles (1) ──< (1) loyalty_accounts (1) ─
 - **loyalty_transactions** — many per account: `points`, `transaction_type`,
   optional `booking_id` (set for completion awards; also the dedupe key).
 
-Schema is created and versioned by Flyway (`src/main/resources/db/migration/V1__init.sql`);
-Hibernate runs in `validate` mode against it in production.
+Schema is created and versioned by Flyway (`src/main/resources/db/migration/`,
+`V1__init.sql` + `V2__loyalty_concurrency.sql`); Hibernate runs in `validate`
+mode against it in production. `loyalty_accounts` carries an optimistic-locking
+`version` column, and `loyalty_transactions` has a unique constraint on
+`(booking_id, transaction_type)` to make the "one award per booking" rule a
+database guarantee.
 
 ## API endpoints
 
@@ -129,7 +133,8 @@ Hibernate runs in `validate` mode against it in production.
 | PATCH | `/api/bookings/{id}/cancel` | owner or ADMIN | Cancel a booking |
 | GET | `/api/loyalty/me` | authenticated | Get own loyalty account |
 | GET | `/api/loyalty/me/transactions` | authenticated | List own loyalty transactions |
-| GET | `/api/admin/bookings` | ADMIN | List all bookings |
+| POST | `/api/loyalty/me/redeem` | authenticated | Redeem points from own account |
+| GET | `/api/admin/bookings` | ADMIN | List all bookings (paged: `?page=&size=&sort=`) |
 | GET | `/api/admin/customers/{id}` | ADMIN | Get any customer profile |
 | PATCH | `/api/admin/bookings/{id}/status` | ADMIN | Update status (COMPLETED awards points) |
 

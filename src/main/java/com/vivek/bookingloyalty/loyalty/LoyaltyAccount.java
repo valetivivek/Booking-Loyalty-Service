@@ -14,6 +14,7 @@ import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.Instant;
 
 /**
@@ -38,6 +39,15 @@ public class LoyaltyAccount {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private LoyaltyTier tier;
+
+    /**
+     * Optimistic-locking version. Guards against lost updates when two
+     * transactions modify the same account concurrently (e.g. a points award
+     * racing a redemption): the second commit fails instead of overwriting.
+     */
+    @Version
+    @Column(nullable = false)
+    private Long version;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

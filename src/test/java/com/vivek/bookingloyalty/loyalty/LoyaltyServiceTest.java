@@ -13,6 +13,7 @@ import com.vivek.bookingloyalty.booking.BookingStatus;
 import com.vivek.bookingloyalty.common.BadRequestException;
 import com.vivek.bookingloyalty.customer.CustomerProfile;
 import com.vivek.bookingloyalty.customer.CustomerRepository;
+import com.vivek.bookingloyalty.loyalty.dto.LoyaltyResponse;
 import com.vivek.bookingloyalty.user.Role;
 import com.vivek.bookingloyalty.user.User;
 import java.math.BigDecimal;
@@ -81,6 +82,52 @@ class LoyaltyServiceTest {
                 .isInstanceOf(BadRequestException.class);
 
         verify(loyaltyAccountRepository, never()).findByCustomerId(eq(20L));
+        verify(loyaltyAccountRepository, never()).save(any());
+        verify(loyaltyTransactionRepository, never()).save(any());
+    }
+
+    private CustomerProfile profileWithId(long userId, long customerId) {
+        User user = new User("u@example.com", "hash", Role.CUSTOMER);
+        ReflectionTestUtils.setField(user, "id", userId);
+        CustomerProfile profile = new CustomerProfile(user, "F", "L", null);
+        ReflectionTestUtils.setField(profile, "id", customerId);
+        return profile;
+    }
+
+    @Test
+    void redeem_deductsPointsRecalculatesTier_andWritesNegativeLedgerEntry() {
+        CustomerProfile profile = profileWithId(7L, 30L);
+        LoyaltyAccount account = new LoyaltyAccount(profile);
+        account.addPoints(1500); // SILVER
+
+        when(customerRepository.findByUserId(7L)).thenReturn(Optional.of(profile));
+        when(loyaltyAccountRepository.findByCustomerId(30L)).thenReturn(Optional.of(account));
+        when(loyaltyAccountRepository.save(any(LoyaltyAccount.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(loyaltyTransactionRepository.save(any(LoyaltyTransaction.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        LoyaltyResponse response = loyaltyService.redeemPoints(7L, 600);
+
+        assertThat(response.pointsBalance()).isEqualTo(900L);
+        assertThat(account.getTier()).isEqualTo(LoyaltyTier.BRONZE); // 900 < 1000
+
+        ArgumentCaptor<LoyaltyTransaction> captor = ArgumentCaptor.forClass(LoyaltyTransaction.class);
+        verify(loyaltyTransactionRepository).save(captor.capture());
+        assertThat(captor.getValue().getPoints()).isEqualTo(-600L);
+        assertThat(captor.getValue().getTransactionType()).isEqualTo(TransactionType.REDEEMED);
+    }
+
+    @Test
+    void redeem_insufficientBalance_throwsAndChangesNothing() {
+        CustomerProfile profile = profileWithId(7L, 30L);
+        LoyaltyAccount account = new LoyaltyAccount(profile);
+        account.addPoints(50);
+
+        when(customerRepository.findByUserId(7L)).thenReturn(Optional.of(profile));
+        when(loyaltyAccountRepository.findByCustomerId(30L)).thenReturn(Optional.of(account));
+
+        assertThatThrownBy(() -> loyaltyService.redeemPoints(7L, 100))
+                .isInstanceOf(BadRequestException.class);
+
         verify(loyaltyAccountRepository, never()).save(any());
         verify(loyaltyTransactionRepository, never()).save(any());
     }

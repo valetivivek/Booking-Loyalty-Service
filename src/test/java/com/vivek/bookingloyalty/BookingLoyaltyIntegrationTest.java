@@ -123,6 +123,39 @@ class BookingLoyaltyIntegrationTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    void redeemFlow_deductsPoints_andRejectsOverspend() throws Exception {
+        String customerToken = registerCustomer("redeem@example.com");
+        String adminToken = createAdminToken("redeem-admin@example.com");
+
+        long bookingId = createBooking(customerToken); // earns 400
+        mockMvc.perform(patch("/api/admin/bookings/" + bookingId + "/status")
+                        .header("Authorization", bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"COMPLETED\"}"))
+                .andExpect(status().isOk());
+
+        // Redeem 100 of the 400 points.
+        mockMvc.perform(post("/api/loyalty/me/redeem")
+                        .header("Authorization", bearer(customerToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"points\":100}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pointsBalance").value(300));
+
+        // Overspending is rejected.
+        mockMvc.perform(post("/api/loyalty/me/redeem")
+                        .header("Authorization", bearer(customerToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"points\":9999}"))
+                .andExpect(status().isBadRequest());
+
+        // Ledger now has the EARNED award and the REDEEMED entry.
+        mockMvc.perform(get("/api/loyalty/me/transactions").header("Authorization", bearer(customerToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+    }
+
     private long createBooking(String token) throws Exception {
         String body = """
                 {"roomType":"DELUXE","checkInDate":"%s","checkOutDate":"%s"}
