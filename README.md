@@ -1,5 +1,7 @@
 # Booking & Loyalty Service
 
+[![CI](https://github.com/valetivivek/Booking-Loyalty-Service/actions/workflows/ci.yml/badge.svg)](https://github.com/valetivivek/Booking-Loyalty-Service/actions/workflows/ci.yml)
+
 A production-style backend for a resort/hotel booking system. Customers register,
 book rooms, and earn loyalty points when their stays are completed. Built with
 Spring Boot 3 and Java 21, secured with JWT + role-based access control, backed by
